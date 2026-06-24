@@ -2,51 +2,117 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Space Shooter - 太空射擊遊戲</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div id="gameWrapper">
+
+    <!-- HUD -->
     <div id="hud">
-      <div class="hud-item">
-        <span class="hud-label">SCORE</span>
-        <span id="scoreDisplay">0</span>
+      <div class="hud-group">
+        <div class="hud-item">
+          <span class="hud-label">SCORE</span>
+          <span id="scoreDisplay">0</span>
+        </div>
+        <div class="hud-item">
+          <span class="hud-label">LEVEL</span>
+          <span id="levelDisplay">1</span>
+        </div>
       </div>
-      <div class="hud-item">
-        <span class="hud-label">LEVEL</span>
-        <span id="levelDisplay">1</span>
-      </div>
-      <div class="hud-item">
-        <span class="hud-label">LIVES</span>
-        <span id="livesDisplay">♥♥♥</span>
-      </div>
-    </div>
-
-    <div id="canvasWrapper">
-      <canvas id="gameCanvas" width="800" height="600"></canvas>
-
-      <div id="gameOverScreen">
-        <div id="gameOverBox">
-          <h2>GAME OVER</h2>
-          <div class="score-row">
-            <span class="score-label">SCORE</span>
-            <span id="finalScore">0</span>
-          </div>
-          <div class="score-row">
-            <span class="score-label">BEST</span>
-            <span id="finalHighScore">0</span>
-          </div>
-          <button id="restartBtn">PLAY AGAIN</button>
-          <p class="hint-text">或按任意鍵繼續</p>
+      <div id="powerupDisplay"></div>
+      <div class="hud-group">
+        <div class="hud-item">
+          <span class="hud-label">TIME</span>
+          <span id="timerDisplay">0:00</span>
+        </div>
+        <div class="hud-item">
+          <span class="hud-label">LIVES</span>
+          <span id="livesDisplay">♥♥♥</span>
         </div>
       </div>
     </div>
 
+    <!-- Canvas + overlays -->
+    <div id="canvasWrapper">
+      <canvas id="gameCanvas" width="800" height="600"></canvas>
+
+      <!-- Start Screen -->
+      <div id="startScreen" class="overlay">
+        <div class="overlay-box start-box">
+          <h1 class="game-title">SPACE<br>SHOOTER</h1>
+          <div class="legend-grid">
+            <span class="leg" style="color:#ff3344">● 偵察機 ×10</span>
+            <span class="leg" style="color:#ff8800">◆ 戰鬥機 ×25</span>
+            <span class="leg" style="color:#bb00ff">■ 巨艦 ×60</span>
+            <span class="leg" style="color:#ff00aa">★ 太空怪物 ×120</span>
+          </div>
+          <div class="pw-legend">
+            <span class="pw-pill shield-pill">⚡護盾</span>
+            <span class="pw-pill rapid-pill">🔥快攻</span>
+            <span class="pw-pill triple-pill">✦三連</span>
+          </div>
+          <div class="name-row">
+            <label class="field-label">指揮官名稱</label>
+            <input id="playerName" class="name-input" type="text" maxlength="12"
+                   placeholder="COMMANDER" autocomplete="off" spellcheck="false">
+          </div>
+          <div class="btn-row">
+            <button id="startBtn"  class="btn btn-primary">START GAME</button>
+            <button id="scoresBtn" class="btn btn-ghost">LEADERBOARD</button>
+          </div>
+          <p class="ctrl-hint">
+            📱 觸控：拖曳移動 · 放手射擊<br>
+            🖱 鍵盤：WASD / 方向鍵 · 空白鍵射擊
+          </p>
+        </div>
+      </div>
+
+      <!-- Game Over Screen -->
+      <div id="gameOverScreen" class="overlay">
+        <div class="overlay-box go-box">
+          <h2 class="go-title">GAME OVER</h2>
+          <div class="stat-grid">
+            <span class="stat-label">SCORE</span><span id="goScore"     class="stat-val gold">0</span>
+            <span class="stat-label">BEST</span> <span id="goHighScore" class="stat-val gold">0</span>
+            <span class="stat-label">LEVEL</span><span id="goLevel"     class="stat-val">0</span>
+            <span class="stat-label">TIME</span> <span id="goTime"      class="stat-val">0:00</span>
+          </div>
+          <div class="name-row">
+            <label class="field-label">存入排行榜</label>
+            <input id="nameInput" class="name-input" type="text" maxlength="12"
+                   placeholder="COMMANDER" autocomplete="off" spellcheck="false">
+          </div>
+          <button id="goSaveBtn" class="btn btn-save">儲 存</button>
+          <div class="btn-row">
+            <button id="goRestartBtn" class="btn btn-primary">再玩一次</button>
+            <button id="goScoresBtn"  class="btn btn-ghost">排 行 榜</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Leaderboard Screen -->
+      <div id="leaderboardScreen" class="overlay">
+        <div class="overlay-box lb-box">
+          <h2 class="lb-title">🏆 LEADERBOARD</h2>
+          <div class="lb-scroll">
+            <table id="lbTable">
+              <thead>
+                <tr><th>#</th><th>名稱</th><th>分數</th><th>關卡</th><th>時間</th><th>日期</th></tr>
+              </thead>
+              <tbody id="lbBody"></tbody>
+            </table>
+          </div>
+          <button id="lbBackBtn" class="btn btn-ghost">← 返回</button>
+        </div>
+      </div>
+    </div><!-- canvasWrapper -->
+
     <div id="controlHint">
-      移動：滑鼠 / WASD / 方向鍵　　射擊：滑鼠左鍵（按住）/ 空白鍵（按住）
+      移動：滑鼠 / 觸控拖曳 / WASD　　射擊：點擊 / 空白鍵　　道具：⚡護盾 🔥快攻 ✦三連射
     </div>
-  </div>
+  </div><!-- gameWrapper -->
 
   <script src="game.js"></script>
 </body>
