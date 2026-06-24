@@ -12,9 +12,6 @@ html, body {
   color: #00ccff;
   overflow: hidden;
   overscroll-behavior: none;
-  user-select: none;
-  -webkit-user-select: none;
-  touch-action: none;
 }
 
 body {

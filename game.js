@@ -730,12 +730,15 @@ canvas.addEventListener('touchend', e => {
 
 // Keyboard
 document.addEventListener('keydown', e => {
+  // Let the user type freely in name inputs
+  if (document.activeElement && document.activeElement.tagName === 'INPUT') return;
+
   if (keys[e.key]) return;
   keys[e.key] = true;
   if (['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','a','s','d','w','A','S','D','W'].includes(e.key)) useMouse = false;
   if ([' ','ArrowUp','ArrowDown'].includes(e.key)) e.preventDefault();
   if (state === S.START)     { ensureAudio(); startGame(); return; }
-  if (state === S.GAME_OVER && !['Tab','Enter'].includes(e.key)) { ensureAudio(); startGame(); }
+  if (state === S.GAME_OVER) { ensureAudio(); startGame(); }
 });
 document.addEventListener('keyup', e => { keys[e.key] = false; });
 
