@@ -126,7 +126,7 @@ const EDEFS = [
   { w: 38, h: 20, hp: 1, spd: 2.0, score: 10,  color: '#ff3344', shoot: false                   },
   { w: 32, h: 34, hp: 2, spd: 1.4, score: 25,  color: '#ff8800', shoot: true, sInt: 180         },
   { w: 50, h: 30, hp: 5, spd: 0.8, score: 60,  color: '#bb00ff', shoot: true, sInt: 130         },
-  { w: 58, h: 42, hp: 6, spd: 2.6, score: 120, color: '#ff00aa', shoot: true, sInt: 90, monster: true },
+  { w: 58, h: 42, hp: 3, spd: 2.6, score: 120, color: '#ff00aa', shoot: true, sInt: 90, monster: true },
 ];
 
 let spawnTimer = 0, spawnInterval = 80;
