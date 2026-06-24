@@ -210,6 +210,11 @@ body {
   width: 220px;
   outline: none;
   transition: border-color 0.2s, box-shadow 0.2s;
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: text;
+  touch-action: auto;
+  -webkit-tap-highlight-color: rgba(0, 255, 204, 0.15);
 }
 .name-input:focus {
   border-color: #00ffcc;

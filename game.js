@@ -87,6 +87,7 @@ const keys     = {};
 let mouseX     = W / 2, mouseY = H - 80;
 let mouseDown  = false;
 let useMouse   = true;   // false = keyboard
+let inputFocused = false; // true while any text input has focus
 
 // Touch state
 let touchActive   = false;
@@ -130,7 +131,7 @@ const EDEFS = [
 ];
 
 let spawnTimer = 0, spawnInterval = 80;
-const MAX_MONSTERS = 3;
+const MAX_MONSTERS = 1; // only 1 monster on screen at a time
 
 // ─── Power-up config ──────────────────────────────────────────────────────────
 const PW_TYPES   = ['shield', 'rapid', 'triple'];
@@ -143,9 +144,9 @@ function spawnEnemy() {
   const r = Math.random();
   let type = 0;
 
-  if (level >= 3 && monCount < MAX_MONSTERS && r < 0.14)      type = 3;
-  else if (level >= 3 && r < 0.28)                             type = 2;
-  else if (level >= 2 && r < 0.55)                             type = 1;
+  if (monCount < MAX_MONSTERS && r < 0.18)                     type = 3; // monsters from level 1
+  else if (level >= 3 && r < 0.32)                             type = 2;
+  else if (level >= 2 && r < 0.58)                             type = 1;
 
   const def = EDEFS[type];
   const spdMult = 1 + (level - 1) * 0.10;
@@ -167,9 +168,11 @@ function spawnEnemy() {
   };
 
   if (type === 3) {
-    // Monster spawns near top, slowly drifts downward
-    e.y  = rand(50, 150);
-    e.vy = 0.25 + (level - 3) * 0.05; // gets faster in higher levels
+    // Monster spawns near top; HP = level, drift speed grows with level
+    e.y     = rand(40, 120);
+    e.hp    = level;
+    e.maxHp = level;
+    e.vy    = 0.35 + level * 0.04; // level 1 → 0.39 px/frame (~25s), level 5 → 0.55
   }
 
   enemies.push(e);
@@ -247,7 +250,12 @@ const timerDom  = document.getElementById('timerDisplay');
 const pwrDom    = document.getElementById('powerupDisplay');
 
 function updateLivesHUD()  { livesDom.textContent = '♥'.repeat(Math.max(0, lives)); }
-function updateTimerHUD()  { timerDom.textContent = toTimeStr(survivalFrames); }
+function updateTimerHUD()  {
+  timerDom.textContent = toTimeStr(survivalFrames);
+  // Level advances every 30 seconds (1800 frames)
+  const nl = Math.floor(survivalFrames / 1800) + 1;
+  if (nl > level) { level = nl; levelDom.textContent = nl; sndLevelUp(); }
+}
 function updatePowerHUD()  {
   const parts = [];
   if (player.shield    > 0) parts.push(`<span class="pw-tag pw-shield">⚡ ${Math.ceil(player.shield/60)}s</span>`);
@@ -257,8 +265,6 @@ function updatePowerHUD()  {
 }
 function updateScoreHUD()  {
   scoreDom.textContent = score;
-  const nl = Math.floor(score / 500) + 1;
-  if (nl > level) { level = nl; levelDom.textContent = nl; sndLevelUp(); }
 }
 
 // ─── Drawing ──────────────────────────────────────────────────────────────────
@@ -534,8 +540,8 @@ function update() {
       e.y += e.vy;
       if (e.x + e.w/2 >= W - 4) { e.dir = -1; e.x = W - 4 - e.w/2; }
       if (e.x - e.w/2 <= 4)     { e.dir =  1; e.x = 4 + e.w/2; }
-      // Crossed the bottom line → player loses a life
-      if (e.y - e.h/2 > H) {
+      // Bottom of monster crosses canvas floor → player loses a life
+      if (e.y + e.h/2 > H) {
         explode(e.x, H - 10, e.color, 20);
         takeDamage();
         return false;
@@ -730,8 +736,7 @@ canvas.addEventListener('touchend', e => {
 
 // Keyboard
 document.addEventListener('keydown', e => {
-  // Let the user type freely in name inputs
-  if (document.activeElement && document.activeElement.tagName === 'INPUT') return;
+  if (inputFocused) return; // let text inputs handle their own keys
 
   if (keys[e.key]) return;
   keys[e.key] = true;
@@ -762,5 +767,11 @@ document.getElementById('lbBackBtn').addEventListener('click', () => {
 });
 
 // ─── Boot ─────────────────────────────────────────────────────────────────────
+// Track focus on all name inputs so keydown doesn't interrupt typing
+document.querySelectorAll('.name-input').forEach(inp => {
+  inp.addEventListener('focus', () => { inputFocused = true; });
+  inp.addEventListener('blur',  () => { inputFocused = false; });
+});
+
 document.getElementById('startScreen').style.display = 'flex';
 loop();
