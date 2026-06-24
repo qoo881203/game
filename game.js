@@ -119,19 +119,22 @@ let particles    = [];
 let powerups     = [];
 
 // ─── Enemy Definitions ────────────────────────────────────────────────────────
-// type 0  Scout         – moves down, fast, 1 HP
-// type 1  Fighter       – moves down + weave, 2 HP, shoots
-// type 2  Dreadnought   – moves down slow, 5 HP, shoots
-// type 3  Space Monster – left/right ONLY, 6 HP, shoots frequently
+// type 0  Scout         – straight down, fast, 1 HP
+// type 1  Fighter       – straight down, 2 HP, shoots
+// type 2  Dreadnought   – straight down slow, 5 HP, shoots
+// type 3  Space Monster – straight down, HP=level, shoots; crossing bottom → lose life
+// type 4  Jellyfish     – left/right + vertical oscillation ±3 cells; homeY drifts down
 const EDEFS = [
-  { w: 38, h: 20, hp: 1, spd: 2.0, score: 10,  color: '#ff3344', shoot: false                   },
-  { w: 32, h: 34, hp: 2, spd: 1.4, score: 25,  color: '#ff8800', shoot: true, sInt: 180         },
-  { w: 50, h: 30, hp: 5, spd: 0.8, score: 60,  color: '#bb00ff', shoot: true, sInt: 130         },
-  { w: 58, h: 42, hp: 3, spd: 2.6, score: 120, color: '#ff00aa', shoot: true, sInt: 90, monster: true },
+  { w: 38, h: 20, hp: 1, spd: 2.0, score: 10,  color: '#ff3344', shoot: false              },
+  { w: 32, h: 34, hp: 2, spd: 1.4, score: 25,  color: '#ff8800', shoot: true,  sInt: 180   },
+  { w: 50, h: 30, hp: 5, spd: 0.8, score: 60,  color: '#bb00ff', shoot: true,  sInt: 130   },
+  { w: 54, h: 40, hp: 3, spd: 0.9, score: 120, color: '#ff00aa', shoot: true,  sInt: 90    },
+  { w: 50, h: 36, hp: 1, spd: 1.8, score: 80,  color: '#00ddff', shoot: true,  sInt: 110   },
 ];
 
 let spawnTimer = 0, spawnInterval = 80;
-const MAX_MONSTERS = 1; // only 1 monster on screen at a time
+const MAX_MONSTERS  = 1; // max type-3 on screen
+const MAX_JELLYFISH = 1; // max type-4 on screen
 
 // ─── Power-up config ──────────────────────────────────────────────────────────
 const PW_TYPES   = ['shield', 'rapid', 'triple'];
@@ -140,39 +143,49 @@ const PW_LABELS  = { shield: '⚡', rapid: '🔥', triple: '✦' };
 
 // ─── Spawn enemy ──────────────────────────────────────────────────────────────
 function spawnEnemy() {
-  const monCount = enemies.filter(e => e.type === 3).length;
+  const monCount   = enemies.filter(e => e.type === 3).length;
+  const jellyCount = enemies.filter(e => e.type === 4).length;
   const r = Math.random();
   let type = 0;
 
-  if (monCount < MAX_MONSTERS && r < 0.18)                     type = 3; // monsters from level 1
+  if (jellyCount < MAX_JELLYFISH && level >= 2 && r < 0.12)   type = 4; // jellyfish from level 2
+  else if (monCount < MAX_MONSTERS && r < 0.18)                type = 3; // space monster
   else if (level >= 3 && r < 0.32)                             type = 2;
   else if (level >= 2 && r < 0.58)                             type = 1;
 
-  const def = EDEFS[type];
+  const def     = EDEFS[type];
   const spdMult = 1 + (level - 1) * 0.10;
 
   const e = {
     type,
-    x:     rand(def.w / 2 + 4, W - def.w / 2 - 4),
-    y:    -def.h / 2,
-    w:     def.w, h: def.h,
-    hp:    def.hp, maxHp: def.hp,
-    spd:   def.spd * spdMult,
-    color: def.color,
+    x:        rand(def.w / 2 + 4, W - def.w / 2 - 4),
+    y:       -def.h / 2,
+    w:        def.w, h: def.h,
+    hp:       def.hp, maxHp: def.hp,
+    spd:      def.spd * spdMult,
+    color:    def.color,
     scoreVal: def.score,
-    canShoot:  !!def.shoot,
-    sTimer:    randInt(0, def.sInt || 120),
-    sInterval: def.sInt || 120,
-    tick:  Math.random() * Math.PI * 2,
-    dir:   Math.random() < 0.5 ? 1 : -1,
+    canShoot: !!def.shoot,
+    sTimer:   randInt(0, def.sInt || 120),
+    sInterval:def.sInt || 120,
+    tick:     Math.random() * Math.PI * 2,
+    dir:      Math.random() < 0.5 ? 1 : -1,
   };
 
   if (type === 3) {
-    // Monster spawns near top; HP = level, drift speed grows with level
-    e.y     = rand(40, 120);
+    // Space Monster: straight down from top; HP scales with level
     e.hp    = level;
     e.maxHp = level;
-    e.vy    = 0.35 + level * 0.04; // level 1 → 0.39 px/frame (~25s), level 5 → 0.55
+  }
+
+  if (type === 4) {
+    // Jellyfish: spawns mid-upper area, moves left-right + vertical oscillation
+    const startY = rand(60, 130);
+    e.y      = startY;
+    e.homeY  = startY;           // homeY drifts down slowly
+    e.vy     = 0.22 + level * 0.03; // drift speed grows per level
+    e.hp     = level;
+    e.maxHp  = level;
   }
 
   enemies.push(e);
@@ -386,6 +399,64 @@ function drawMonster(e) {
   ctx.fillRect(-bw/2, 45, bw * ratio, 5);
 }
 
+function drawJellyfish(e) {
+  const pulse = 0.5 + 0.5 * Math.sin(e.tick * 0.1);
+
+  // Outer aura
+  ctx.shadowColor = '#00eeff'; ctx.shadowBlur = 14 + pulse * 8;
+
+  // Translucent dome body
+  ctx.fillStyle = `rgba(0, 160, 230, ${0.22 + pulse * 0.14})`;
+  ctx.beginPath(); ctx.arc(0, -6, 23, Math.PI, 0, false); ctx.closePath(); ctx.fill();
+
+  // Dome rim
+  ctx.strokeStyle = `rgba(0, 230, 255, ${0.55 + pulse * 0.35})`;
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(0, -6, 23, Math.PI, 0, false); ctx.closePath(); ctx.stroke();
+
+  // Inner shimmer
+  ctx.fillStyle = `rgba(140, 240, 255, ${0.08 + pulse * 0.1})`;
+  ctx.beginPath(); ctx.arc(0, -10, 14, Math.PI, 0, false); ctx.closePath(); ctx.fill();
+
+  // Bell frills (bottom edge)
+  ctx.lineWidth = 1.5;
+  for (let i = -3; i <= 3; i++) {
+    const bx = i * 6;
+    ctx.strokeStyle = `rgba(0, 210, 255, ${0.5 + pulse * 0.3})`;
+    ctx.beginPath(); ctx.moveTo(bx, 17); ctx.quadraticCurveTo(bx + 3, 23, bx, 27); ctx.stroke();
+  }
+
+  // Tentacles (5)
+  for (let i = 0; i < 5; i++) {
+    const tx   = (i - 2) * 9;
+    const wave = Math.sin(e.tick * 0.08 + i * 0.9) * 10;
+    ctx.strokeStyle = `rgba(0, 200, 255, ${0.4 + 0.3 * Math.sin(e.tick * 0.06 + i)})`;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(tx, 27);
+    ctx.quadraticCurveTo(tx + wave, 38, tx + wave * 0.8, 50); ctx.stroke();
+    ctx.fillStyle = '#00ddff';
+    ctx.beginPath(); ctx.arc(tx + wave * 0.8, 50, 2.5, 0, Math.PI * 2); ctx.fill();
+  }
+
+  // Eyes (2)
+  ctx.shadowColor = '#ffffff'; ctx.shadowBlur = 5;
+  [-7, 7].forEach(ex => {
+    ctx.fillStyle = 'rgba(200, 245, 255, 0.9)';
+    ctx.beginPath(); ctx.arc(ex, -9, 3, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#001a2e';
+    ctx.beginPath(); ctx.arc(ex, -9, 1.5, 0, Math.PI * 2); ctx.fill();
+  });
+
+  // HP bar
+  const ratio = e.hp / e.maxHp;
+  const bw = e.w;
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = '#001520'; ctx.fillRect(-bw/2, -e.h/2 - 9, bw, 4);
+  const hc = ratio > 0.5 ? '#00ddff' : ratio > 0.25 ? '#ffaa00' : '#ff2200';
+  ctx.fillStyle = hc; ctx.shadowColor = hc; ctx.shadowBlur = 4;
+  ctx.fillRect(-bw/2, -e.h/2 - 9, bw * ratio, 4);
+}
+
 function drawEnemy(e) {
   ctx.save(); ctx.translate(e.x, e.y);
   ctx.shadowColor = e.color; ctx.shadowBlur = 10;
@@ -393,10 +464,11 @@ function drawEnemy(e) {
   if      (e.type === 0) drawScout(e);
   else if (e.type === 1) drawFighter(e);
   else if (e.type === 2) drawDreadnought(e);
-  else                   drawMonster(e);
+  else if (e.type === 3) drawMonster(e);
+  else                   drawJellyfish(e);
 
-  // Generic HP bar for types 1-2
-  if (e.maxHp > 1 && e.type !== 3) {
+  // HP bar for multi-hit regular enemies (type 1-2)
+  if (e.maxHp > 1 && e.type !== 3 && e.type !== 4) {
     ctx.shadowBlur = 0;
     ctx.fillStyle = '#1a1a2e'; ctx.fillRect(-e.w/2, -e.h/2 - 8, e.w, 4);
     const r = e.hp / e.maxHp;
@@ -534,22 +606,27 @@ function update() {
   enemies = enemies.filter(e => {
     e.tick++;
 
-    if (e.type === 3) {
-      // Space Monster: horizontal bounce + slow downward drift
+    if (e.type === 4) {
+      // Jellyfish: left-right bounce + vertical oscillation within ±3 cells (90px)
       e.x += e.dir * e.spd;
-      e.y += e.vy;
       if (e.x + e.w/2 >= W - 4) { e.dir = -1; e.x = W - 4 - e.w/2; }
       if (e.x - e.w/2 <= 4)     { e.dir =  1; e.x = 4 + e.w/2; }
-      // Bottom of monster crosses canvas floor → player loses a life
-      if (e.y + e.h/2 > H) {
-        explode(e.x, H - 10, e.color, 20);
+      e.homeY += e.vy;
+      e.y = e.homeY + Math.sin(e.tick * 0.04) * 90;
+      // When homeY + oscillation amplitude crosses the floor → lose a life
+      if (e.homeY + 90 > H) {
+        explode(e.x, H - 20, e.color, 24);
         takeDamage();
         return false;
       }
     } else {
+      // All others (0,1,2,3): straight down, no horizontal drift
       e.y += e.spd;
-      if (e.type === 1) e.x += Math.sin(e.tick * 0.055 + e.x * 0.01) * 1.0;
-      if (e.y > H + e.h) return false;
+      if (e.y > H + e.h) {
+        // Space Monster escaping the bottom → lose a life
+        if (e.type === 3) { explode(e.x, H - 10, e.color, 18); takeDamage(); }
+        return false;
+      }
     }
 
     // Enemy shooting
@@ -561,15 +638,16 @@ function update() {
 
     // Player collision
     const phx = player.x - 13, phy = player.y - 13;
+    const isBoss = (e.type === 3 || e.type === 4);
     if (player.invTimer === 0 &&
         aabbHit(phx, phy, 26, 26, e.x - e.w/2, e.y - e.h/2, e.w, e.h)) {
-      explode(e.x, e.y, e.color, e.type === 3 ? 18 : 14);
+      explode(e.x, e.y, e.color, isBoss ? 18 : 14);
       if (player.shield > 0) {
         player.shield = 0; sndExplosion();
-        if (e.type !== 3) return false; // monsters stay, others die
+        if (!isBoss) return false;
       } else {
         takeDamage();
-        if (e.type !== 3) return false;
+        if (!isBoss) return false;
       }
     }
     return true;
@@ -588,13 +666,14 @@ function update() {
         bullets.splice(bi, 1);
         if (e.hp <= 0) {
           score += e.scoreVal * level;
-          explode(e.x, e.y, e.color, e.type === 3 ? 32 : 22);
+          const isBoss = (e.type === 3 || e.type === 4);
+          explode(e.x, e.y, e.color, isBoss ? 32 : 22);
           sndExplosion();
-          if (e.type === 3) sndMonsterHit();
+          if (isBoss) sndMonsterHit();
           maybeDrop(e.x, e.y);
           enemies.splice(ei, 1);
           updateScoreHUD();
-        } else if (e.type === 3) {
+        } else if (e.type === 3 || e.type === 4) {
           sndMonsterHit();
         }
         continue outer;
