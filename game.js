@@ -167,8 +167,9 @@ function spawnEnemy() {
   };
 
   if (type === 3) {
-    // Monster spawns in upper zone and stays there
-    e.y = rand(50, 200);
+    // Monster spawns near top, slowly drifts downward
+    e.y  = rand(50, 150);
+    e.vy = 0.25 + (level - 3) * 0.05; // gets faster in higher levels
   }
 
   enemies.push(e);
@@ -528,10 +529,17 @@ function update() {
     e.tick++;
 
     if (e.type === 3) {
-      // Space Monster: horizontal bounce only
+      // Space Monster: horizontal bounce + slow downward drift
       e.x += e.dir * e.spd;
+      e.y += e.vy;
       if (e.x + e.w/2 >= W - 4) { e.dir = -1; e.x = W - 4 - e.w/2; }
       if (e.x - e.w/2 <= 4)     { e.dir =  1; e.x = 4 + e.w/2; }
+      // Crossed the bottom line → player loses a life
+      if (e.y - e.h/2 > H) {
+        explode(e.x, H - 10, e.color, 20);
+        takeDamage();
+        return false;
+      }
     } else {
       e.y += e.spd;
       if (e.type === 1) e.x += Math.sin(e.tick * 0.055 + e.x * 0.01) * 1.0;
