@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>⚡ Agent 雙雄闖關</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --a: #00f5ff;
+  --b: #ff6b6b;
+  --bg: #0a0a0f;
+  --panel: #12121a;
+  --txt: #e0e0ff;
+  --gold: #ffd700;
+}
+
+body {
+  background: var(--bg);
+  color: var(--txt);
+  font-family: 'Courier New', monospace;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background:
+    radial-gradient(ellipse at 20% 20%, rgba(0,245,255,.06) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 80%, rgba(255,107,107,.06) 0%, transparent 50%);
+  pointer-events: none;
+}
+
+body::after {
+  content: '';
+  position: fixed; inset: 0;
+  background-image:
+    linear-gradient(rgba(0,245,255,.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,245,255,.025) 1px, transparent 1px);
+  background-size: 50px 50px;
+  pointer-events: none;
+}
+
+/* ── Screens ── */
+.screen {
+  position: fixed; inset: 0;
+  display: none; flex-direction: column;
+  align-items: center; justify-content: center;
+  z-index: 10; padding: 20px;
+}
+.screen.active { display: flex; }
+
+/* ── Title ── */
+#titleScreen { gap: 22px; text-align: center; }
+
+.game-title {
+  font-size: clamp(1.8em, 5vw, 3em);
+  font-weight: bold; letter-spacing: 4px;
+  text-shadow: 0 0 30px var(--a), 0 0 60px rgba(0,245,255,.3);
+  animation: pulse 2.5s ease-in-out infinite;
+}
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.75} }
+
+.subtitle { color: #777; font-size: 1.05em; }
+
+.how-to {
+  background: rgba(255,255,255,.03);
+  border: 1px solid #2a2a3a;
+  border-radius: 10px; padding: 18px 24px;
+  max-width: 480px; text-align: left;
+}
+.how-to h3 { color: var(--gold); margin-bottom: 10px; text-align: center; font-size: 1em; }
+.how-to li { list-style: none; padding: 4px 0; color: #999; font-size: .88em; }
+.how-to li::before { content: '▶ '; color: var(--a); }
+
+.name-input {
+  background: var(--panel); border: 1px solid var(--a);
+  color: var(--txt); padding: 11px 20px; font-size: 1.05em;
+  font-family: inherit; border-radius: 6px; text-align: center;
+  width: 280px; outline: none;
+  box-shadow: 0 0 12px rgba(0,245,255,.15);
+  transition: box-shadow .2s;
+}
+.name-input:focus { box-shadow: 0 0 22px rgba(255,215,0,.35); border-color: var(--gold); }
+
+.row { display: flex; gap: 14px; }
+
+/* ── Buttons ── */
+.btn {
+  padding: 11px 26px; border: none; border-radius: 6px;
+  font-family: inherit; font-size: 1em; cursor: pointer;
+  transition: transform .15s, box-shadow .15s;
+  text-transform: uppercase; letter-spacing: 2px;
+}
+.btn:hover { transform: translateY(-2px); }
+
+.btn-primary {
+  background: linear-gradient(135deg,#00c3ff,#0055ee);
+  color: #fff; box-shadow: 0 0 18px rgba(0,195,255,.35);
+}
+.btn-primary:hover { box-shadow: 0 0 28px rgba(0,195,255,.6); }
+
+.btn-ghost {
+  background: rgba(255,255,255,.04);
+  border: 1px solid #333; color: #999;
+}
+.btn-ghost:hover { border-color: #666; color: #ccc; }
+
+.btn-alpha {
+  flex: 1; background: linear-gradient(135deg,#002a44,#0055aa);
+  color: var(--a); border: 1px solid var(--a);
+  box-shadow: 0 0 12px rgba(0,245,255,.15); font-size: .9em;
+}
+.btn-alpha:hover:not(:disabled) { box-shadow: 0 0 24px rgba(0,245,255,.5); }
+.btn-beta {
+  flex: 1; background: linear-gradient(135deg,#2d0011,#880022);
+  color: var(--b); border: 1px solid var(--b);
+  box-shadow: 0 0 12px rgba(255,107,107,.15); font-size: .9em;
+}
+.btn-beta:hover:not(:disabled) { box-shadow: 0 0 24px rgba(255,107,107,.5); }
+button:disabled { opacity: .4; cursor: not-allowed; transform: none !important; }
+
+/* ── Game Screen ── */
+#gameScreen {
+  display: none; flex-direction: column;
+  width: min(1100px, 100%); height: 100vh;
+  padding: 12px; gap: 10px;
+}
+#gameScreen.active { display: flex; }
+
+/* HUD */
+.hud {
+  display: flex; align-items: center; justify-content: space-between;
+  background: var(--panel); border: 1px solid #252535;
+  border-radius: 8px; padding: 10px 20px; flex-shrink: 0;
+  gap: 10px; flex-wrap: wrap;
+}
+.hud-item { text-align: center; }
+.hud-label { font-size: .68em; color: #555; text-transform: uppercase; letter-spacing: 1px; }
+.hud-value { font-size: 1.25em; font-weight: bold; color: var(--gold); }
+
+.lives { display: flex; gap: 4px; }
+.life { font-size: 1.15em; transition: all .3s; }
+.life.lost { opacity: .2; filter: grayscale(1); }
+
+.timer-wrap { flex: 1; min-width: 120px; text-align: center; }
+.timer-bar { height: 4px; background: #1e1e2e; border-radius: 2px; margin-top: 4px; overflow: hidden; }
+.timer-fill {
+  height: 100%; border-radius: 2px;
+  background: linear-gradient(90deg,#00ff88,#ffee00,#ff4444);
+  transition: width 1s linear;
+}
+
+/* Question panel */
+.q-panel {
+  background: var(--panel); border: 1px solid #2a2a3a;
+  border-radius: 8px; padding: 16px 20px;
+  text-align: center; flex-shrink: 0;
+}
+.level-badge { font-size: .75em; color: var(--gold); letter-spacing: 3px; text-transform: uppercase; margin-bottom: 6px; }
+.q-text { font-size: clamp(1em, 2.5vw, 1.35em); color: #fff; line-height: 1.5; min-height: 2.4em; display: flex; align-items: center; justify-content: center; }
+
+.q-dots { display: flex; gap: 6px; justify-content: center; margin-top: 8px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: #252535; border: 1px solid #3a3a4a; }
+.dot.done { background: #00ff88; border-color: #00ff88; }
+.dot.cur  { background: var(--gold); border-color: var(--gold); }
+
+/* Agents area */
+.agents { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; flex: 1; min-height: 0; }
+
+.agent-panel {
+  background: var(--panel); border-radius: 8px;
+  padding: 14px; display: flex; flex-direction: column; overflow: hidden;
+}
+.agent-panel.alpha { border: 1px solid rgba(0,245,255,.35); }
+.agent-panel.beta  { border: 1px solid rgba(255,107,107,.35); }
+
+@keyframes glow-a { 0%,100%{box-shadow:0 0 6px rgba(0,245,255,.15)} 50%{box-shadow:0 0 22px rgba(0,245,255,.5)} }
+@keyframes glow-b { 0%,100%{box-shadow:0 0 6px rgba(255,107,107,.15)} 50%{box-shadow:0 0 22px rgba(255,107,107,.5)} }
+.agent-panel.alpha.speaking { animation: glow-a 1s ease-in-out infinite; }
+.agent-panel.beta.speaking  { animation: glow-b 1s ease-in-out infinite; }
+
+.agent-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; flex-shrink: 0; }
+.avatar {
+  width: 46px; height: 46px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.4em; flex-shrink: 0;
+}
+.alpha .avatar {
+  background: radial-gradient(circle,#003355,#001122);
+  border: 2px solid var(--a); box-shadow: 0 0 14px rgba(0,245,255,.4);
+}
+.beta .avatar {
+  background: radial-gradient(circle,#330011,#110005);
+  border: 2px solid var(--b); box-shadow: 0 0 14px rgba(255,107,107,.4);
+}
+@keyframes bob { 0%,100%{transform:scale(1)} 50%{transform:scale(1.08)} }
+.avatar.talking { animation: bob .35s ease-in-out infinite; }
+
+.agent-name { font-size: .95em; font-weight: bold; }
+.alpha .agent-name { color: var(--a); }
+.beta  .agent-name { color: var(--b); }
+.agent-role { font-size: .7em; color: #555; }
+
+.dialogue { flex: 1; overflow-y: auto; font-size: .87em; line-height: 1.65; color: #bbb; padding-right: 4px; }
+.dialogue::-webkit-scrollbar { width: 3px; }
+.dialogue::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+
+.ans-chip {
+  font-size: 1.02em; font-weight: bold; padding: 7px 10px;
+  border-radius: 4px; margin-bottom: 8px; white-space: pre-wrap;
+}
+.alpha .ans-chip { color: var(--a); background: rgba(0,245,255,.08); border-left: 3px solid var(--a); }
+.beta  .ans-chip { color: var(--b); background: rgba(255,107,107,.08); border-left: 3px solid var(--b); }
+
+.rebuttal { margin-top: 8px; color: #888; font-style: italic; font-size: .92em; }
+
+/* Typing cursor */
+.typing::after { content: '▋'; animation: blink .65s step-end infinite; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+/* Choices */
+.choices-wrap { flex-shrink: 0; }
+.choices-label { text-align: center; font-size: .78em; color: #555; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 7px; }
+.choices { display: flex; gap: 10px; }
+
+/* Result overlay */
+.overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.82);
+  display: none; align-items: center; justify-content: center; z-index: 200;
+}
+.overlay.show { display: flex; }
+.result-card {
+  background: var(--panel); border-radius: 14px;
+  padding: 38px 44px; text-align: center;
+  max-width: 480px; width: 90%;
+}
+.r-icon { font-size: 3.5em; margin-bottom: 14px; }
+.r-title { font-size: 1.9em; font-weight: bold; margin-bottom: 12px; }
+.r-expl { color: #999; font-size: .93em; line-height: 1.6; margin: 12px 0; }
+.r-pts { font-size: 1.5em; font-weight: bold; color: var(--gold); }
+
+.result-card.ok  { border: 2px solid #00ff88; box-shadow: 0 0 30px rgba(0,255,136,.3); }
+.result-card.ok .r-title  { color: #00ff88; }
+.result-card.err { border: 2px solid #ff4444; box-shadow: 0 0 30px rgba(255,68,68,.3); }
+.result-card.err .r-title { color: #ff4444; }
+.result-card.tmo { border: 2px solid #ffaa00; box-shadow: 0 0 30px rgba(255,170,0,.25); }
+.result-card.tmo .r-title { color: #ffaa00; }
+
+/* Level complete / Victory / Game over */
+#levelCompleteScreen, #victoryScreen, #gameOverScreen { gap: 22px; text-align: center; }
+
+.big-title { font-size: clamp(1.8em, 4vw, 2.5em); font-weight: bold; }
+.big-title.gold { color: var(--gold); text-shadow: 0 0 25px rgba(255,215,0,.5); }
+.big-title.red  { color: #ff4444; text-shadow: 0 0 20px rgba(255,68,68,.5); }
+
+@keyframes celebrate { 0%,100%{transform:scale(1)} 50%{transform:scale(1.18)} }
+#victoryScreen .r-icon { animation: celebrate 1.2s ease-in-out infinite; font-size: 4em; }
+
+/* Leaderboard */
+#leaderboardScreen { gap: 20px; max-width: 600px; width: 100%; }
+.lb-title { font-size: 2em; color: var(--gold); text-align: center; }
+.lb-table { background: var(--panel); border: 1px solid #252535; border-radius: 10px; overflow: hidden; width: 100%; }
+.lb-head, .lb-row { display: grid; grid-template-columns: 64px 1fr 110px 90px; padding: 11px 18px; align-items: center; }
+.lb-head { background: #0e0e1a; color: #444; font-size: .75em; text-transform: uppercase; }
+.lb-row { border-top: 1px solid #1c1c2a; transition: background .18s; }
+.lb-row:hover { background: rgba(255,255,255,.025); }
+.lb-row.hl { background: rgba(255,215,0,.05); border-left: 3px solid var(--gold); }
+.lb-rank { font-weight: bold; font-size: 1.1em; }
+.rank-1{color:#ffd700} .rank-2{color:#c0c0c0} .rank-3{color:#cd7f32}
+.lb-score { color: var(--gold); font-weight: bold; }
+.lb-lv { color: #666; font-size: .88em; }
+.lb-empty { text-align: center; color: #444; padding: 40px; font-style: italic; }
+</style>
+</head>
+<body>
+
+<!-- ── Title ── -->
+<div id="titleScreen" class="screen active">
+  <div class="game-title">⚡ AGENT 雙雄闖關 ⚡</div>
+  <div class="subtitle">Alpha 與 Beta 正在激烈辯論——你選誰？</div>
+
+  <ul class="how-to">
+    <h3>⚙ 遊戲說明</h3>
+    <li>觀察 Agent Alpha 與 Agent Beta 的辯論過程</li>
+    <li>選擇你認為答案正確的那位 Agent</li>
+    <li>共 5 個關卡，每關 3 題，難度逐漸上升</li>
+    <li>3 條生命，答錯或超時均失去一條生命</li>
+    <li>快速答對可獲得時間加分 × 關卡倍率</li>
+  </ul>
+
+  <input id="playerName" class="name-input" type="text" placeholder="輸入你的名字…" maxlength="12">
+
+  <div class="row">
+    <button class="btn btn-primary" onclick="startGame()">開始闖關</button>
+    <button class="btn btn-ghost"   onclick="showLeaderboard()">🏆 排行榜</button>
+  </div>
+</div>
+
+<!-- ── Game ── -->
+<div id="gameScreen" class="screen">
+  <!-- HUD -->
+  <div class="hud">
+    <div class="hud-item"><div class="hud-label">關卡</div><div class="hud-value" id="hLv">1/5</div></div>
+    <div class="hud-item">
+      <div class="hud-label">生命</div>
+      <div class="lives">
+        <span class="life" id="lf1">❤️</span>
+        <span class="life" id="lf2">❤️</span>
+        <span class="life" id="lf3">❤️</span>
+      </div>
+    </div>
+    <div class="hud-item timer-wrap">
+      <div class="hud-label">計時</div>
+      <div class="hud-value" id="hTimer">30</div>
+      <div class="timer-bar"><div class="timer-fill" id="timerFill" style="width:100%"></div></div>
+    </div>
+    <div class="hud-item"><div class="hud-label">本關</div><div class="hud-value" id="hLvScore">0</div></div>
+    <div class="hud-item"><div class="hud-label">總分</div><div class="hud-value" id="hScore">0</div></div>
+  </div>
+
+  <!-- Question -->
+  <div class="q-panel">
+    <div class="level-badge" id="lvBadge">第一關</div>
+    <div class="q-text" id="qText">載入中…</div>
+    <div class="q-dots" id="qDots"></div>
+  </div>
+
+  <!-- Agents -->
+  <div class="agents">
+    <div class="agent-panel alpha" id="panelA">
+      <div class="agent-head">
+        <div class="avatar" id="avatarA">🤖</div>
+        <div>
+          <div class="agent-name">Agent Alpha</div>
+          <div class="agent-role">邏輯分析型 · 理性主義</div>
+        </div>
+      </div>
+      <div class="dialogue">
+        <div class="ans-chip" id="ansA"></div>
+        <div id="rsA"></div>
+        <div class="rebuttal" id="rebA"></div>
+      </div>
+    </div>
+
+    <div class="agent-panel beta" id="panelB">
+      <div class="agent-head">
+        <div class="avatar" id="avatarB">🦾</div>
+        <div>
+          <div class="agent-name">Agent Beta</div>
+          <div class="agent-role">直覺感知型 · 創意主義</div>
+        </div>
+      </div>
+      <div class="dialogue">
+        <div class="ans-chip" id="ansB"></div>
+        <div id="rsB"></div>
+        <div class="rebuttal" id="rebB"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Choices -->
+  <div class="choices-wrap">
+    <div class="choices-label">選擇你支持的 Agent</div>
+    <div class="choices">
+      <button class="btn btn-alpha" id="btnA" onclick="pick('alpha')" disabled>支持 Alpha</button>
+      <button class="btn btn-beta"  id="btnB" onclick="pick('beta')"  disabled>支持 Beta</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Result Overlay ── -->
+<div class="overlay" id="overlay">
+  <div class="result-card" id="rCard">
+    <div class="r-icon" id="rIcon"></div>
+    <div class="r-title" id="rTitle"></div>
+    <div class="r-expl"  id="rExpl"></div>
+    <div class="r-pts"   id="rPts"></div>
+  </div>
+</div>
+
+<!-- ── Level Complete ── -->
+<div id="levelCompleteScreen" class="screen">
+  <div class="r-icon" style="font-size:3.5em">🎉</div>
+  <div class="big-title gold">關卡完成！</div>
+  <div style="color:#aaa;font-size:1.1em" id="lcMsg"></div>
+  <div style="font-size:1.8em;color:var(--gold)" id="lcScore"></div>
+  <div style="color:#666;font-size:.9em" id="lcTotal"></div>
+  <button class="btn btn-primary" id="nextBtn">下一關 ▶</button>
+</div>
+
+<!-- ── Game Over ── -->
+<div id="gameOverScreen" class="screen">
+  <div class="r-icon" style="font-size:4em">💀</div>
+  <div class="big-title red">遊戲結束</div>
+  <div style="color:#aaa" id="goReason"></div>
+  <div style="font-size:2em;color:var(--gold)" id="goScore"></div>
+  <div style="color:#888;font-size:.9em" id="goRank"></div>
+  <div class="row">
+    <button class="btn btn-primary" onclick="restartGame()">再挑戰</button>
+    <button class="btn btn-ghost"   onclick="showLeaderboard()">排行榜</button>
+  </div>
+</div>
+
+<!-- ── Victory ── -->
+<div id="victoryScreen" class="screen">
+  <div class="r-icon" style="font-size:4em">🏆</div>
+  <div class="big-title gold">恭喜通關！</div>
+  <div style="color:#aaa;font-size:1.05em">你已通過全部 5 個關卡！</div>
+  <div style="font-size:2em;color:var(--gold);font-weight:bold" id="vcScore"></div>
+  <div style="color:#888;font-size:.9em" id="vcRank"></div>
+  <div class="row">
+    <button class="btn btn-primary" onclick="restartGame()">再挑戰</button>
+    <button class="btn btn-ghost"   onclick="showLeaderboard()">排行榜</button>
+  </div>
+</div>
+
+<!-- ── Leaderboard ── -->
+<div id="leaderboardScreen" class="screen">
+  <div class="lb-title">🏆 排行榜</div>
+  <div class="lb-table">
+    <div class="lb-head"><span>名次</span><span>玩家</span><span>分數</span><span>通關</span></div>
+    <div id="lbEntries"></div>
+  </div>
+  <button class="btn btn-primary" onclick="show('titleScreen')">返回主選單</button>
+</div>
+
+<script>
+// ══════════════════════════════════════
+//  GAME DATA
+// ══════════════════════════════════════
+const LEVELS = [
+  {
+    id:1, title:'第一關：文字陷阱', time:30,
+    qs:[
+      {
+        q:'哪個月份有 28 天？',
+        aA:'二月', aB:'每個月都有',
+        rA:'顯然是二月！其他月份都有30或31天，二月才是28天，這個答案一清二楚。',
+        rB:'等等，Alpha！問題問的是「有28天」，不是「只有28天」。所有月份都「有」28天，只是某些月份還有更多天而已！',
+        reb:'……你說得對，Beta。我陷入了語言陷阱，慚愧！',
+        cor:'beta',
+        ex:'所有月份都至少有28天！「有28天」≠「只有28天」，這是個語言陷阱。'
+      },{
+        q:'一個農夫有 17 頭牛，除了 9 頭之外全部死了，還剩幾頭？',
+        aA:'8 頭', aB:'9 頭',
+        rA:'17 減 9 等於 8！死了大部分，剩下 8 頭，這是基本算術。',
+        rB:'仔細讀題！「除了9頭之外全部死了」——意思是9頭活著，其餘都死了。所以剩下 9 頭！',
+        reb:'啊……「除了9頭之外」。我太急著算數了，完全忽略文字意思。',
+        cor:'beta',
+        ex:'「除了9頭之外全部死了」= 9頭存活。剩下 9 頭！別急著算術，先理解文意。'
+      },{
+        q:'什麼東西越洗越髒？',
+        aA:'水', aB:'毛巾',
+        rA:'是水！你洗手時水吸收污垢，越洗水越髒，最後連污水都變黑了。這是個古老謎語。',
+        rB:'是毛巾吧？用毛巾擦手擦臉，毛巾不就越來越髒嗎？日常邏輯。',
+        reb:'毛巾也說得通，但謎語的標準答案是水——清水在洗滌過程中不斷變濁。',
+        cor:'alpha',
+        ex:'水！清水在洗滌過程中越來越髒渾濁，是傳統謎語的標準答案。'
+      }
+    ]
+  },{
+    id:2, title:'第二關：數字邏輯', time:25,
+    qs:[
+      {
+        q:'3 + 3 ÷ 3 = ？',
+        aA:'4', aB:'2',
+        rA:'先乘除後加減！3 ÷ 3 = 1，再算 3 + 1 = 4。數學運算有優先順序，不可違反！',
+        rB:'從左到右算最自然：3 + 3 = 6，6 ÷ 3 = 2。直覺就是答案！',
+        reb:'Beta，數學不能靠直覺！運算優先順序是死規定：乘除 > 加減。',
+        cor:'alpha',
+        ex:'先乘除後加減：3 + (3÷3) = 3 + 1 = 4。數學運算有固定優先順序！'
+      },{
+        q:'5 台機器 5 分鐘做 5 個零件。100 台機器 100 分鐘做幾個？',
+        aA:'2000 個', aB:'100 個',
+        rA:'1台機器每5分鐘做1個。100台機器每5分鐘做100個，100分鐘有20個5分鐘，所以 100×20 = 2000個！',
+        rB:'5台→5個，100台→100個，等比例放大，答案就是100個！',
+        reb:'Beta，你忘記時間也放大了！時間從5分鐘變成100分鐘，是20倍，所以還要再乘以20。',
+        cor:'alpha',
+        ex:'1台機器每5分鐘產1個。100分鐘＝20個5分鐘，100台×20批 = 2000個！'
+      },{
+        q:'你在賽跑中超越了第 2 名，你現在是第幾名？',
+        aA:'第 2 名', aB:'第 1 名',
+        rA:'你超過第2名，你取代了他的位置，現在是第2名。第1名還在你前面！',
+        rB:'超越就是贏了他！超過第2名當然變第1名，這還用想嗎？',
+        reb:'Beta，超越第2名表示你從第2名後方跑到第2名前方，你佔據了第2名的位置，不是第1名！',
+        cor:'alpha',
+        ex:'超越第2名 = 你現在排在他前面 = 你是第2名。第1名還在更前方！'
+      }
+    ]
+  },{
+    id:3, title:'第三關：科學常識', time:20,
+    qs:[
+      {
+        q:'人體最大的器官是什麼？',
+        aA:'皮膚', aB:'肝臟',
+        rA:'毫無疑問是皮膚！面積約 1.5～2 平方公尺，重量約 3～4 公斤，是人體面積最大的器官。',
+        rB:'我覺得是肝臟？肝臟負責超過500種功能，重量也有1.5公斤，感覺很重要也很大！',
+        reb:'Beta，重要≠最大！皮膚面積遠超肝臟，而且「最大」通常指面積，皮膚完勝。',
+        cor:'alpha',
+        ex:'皮膚是人體最大的器官，成人皮膚面積約 1.5～2 平方公尺！'
+      },{
+        q:'閃電和雷聲，哪個先被我們感知到？',
+        aA:'閃電（先看到）', aB:'雷聲（先聽到）',
+        rA:'光速每秒約30萬公里，音速每秒約340公尺。兩者同時產生，但光先到達眼睛，所以先看到閃電！',
+        rB:'雷聲感覺力量很強大……雷聲應該更快更早出現吧？',
+        reb:'Beta，力量和速度是兩回事！光速是音速的約88萬倍，閃電先到無庸置疑。',
+        cor:'alpha',
+        ex:'閃電和雷聲同時產生，但光速（每秒30萬km）遠快於音速（每秒340m），所以先看到閃電。'
+      },{
+        q:'地球表面大約有多少比例被水覆蓋？',
+        aA:'約 71%', aB:'約 40%',
+        rA:'地球表面約71%被海洋覆蓋，陸地只佔29%。這就是為什麼從太空看地球是藍色的！',
+        rB:'感覺到處都是陸地，我猜40%左右？人類文明都建在陸地上，土地應該更多。',
+        reb:'Beta，人類的陸地視角太局限了！從衛星俯瞰，藍色（水）遠多於綠色（陸地）。',
+        cor:'alpha',
+        ex:'地球表面約 71% 是海洋，29% 是陸地。地球其實更像「水球」！'
+      }
+    ]
+  },{
+    id:4, title:'第四關：邏輯推理', time:18,
+    qs:[
+      {
+        q:'父親剛死，醫生說「我不能幫他手術，因為他是我兒子」。醫生是誰？',
+        aA:'繼父', aB:'母親',
+        rA:'生父死了，但或許有繼父？等等……也可能是……',
+        rB:'醫生是他的母親！題目沒說醫生是男性，外科醫生可以是女性，而媽媽對他來說當然是「他是我兒子」！',
+        reb:'你說得完全正確，Beta。我陷入了性別刻板印象的思維陷阱。',
+        cor:'beta',
+        ex:'外科醫生是病患的母親！這道題考的是打破「外科醫生＝男性」的性別刻板印象。'
+      },{
+        q:'盒子裡有紅球和藍球，至少取出幾顆才能確保有一對同色的球？',
+        aA:'3 顆', aB:'2 顆',
+        rA:'鴿巢原理！只有兩種顏色，取出3顆時，必定有至少兩顆同色。取3顆才能「確保」！',
+        rB:'取2顆就好了，運氣好第一顆紅第二顆也紅，就有一對了！',
+        reb:'Beta，題目說「確保」，不是「可能」！取2顆可能一紅一藍，沒有配對，必須取3顆才能確保。',
+        cor:'alpha',
+        ex:'鴿巢原理：2種顏色取3顆，必有至少兩顆同色。取2顆仍可能一紅一藍，無法「確保」！'
+      },{
+        q:'10 層大樓，電梯從 1 樓到 10 樓共走幾段？',
+        aA:'9 段', aB:'10 段',
+        rA:'1→2是第1段，2→3是第2段……9→10是第9段。10個樓層之間有9個間隔，共 9 段！',
+        rB:'10層樓就是10段啊，每層一段！直覺上很自然。',
+        reb:'Beta，你在數樓層，我在數「段」。10個點之間有9個間隔，就像5個人站一排中間只有4個空隙！',
+        cor:'alpha',
+        ex:'n層樓之間有 n-1 段！10層樓有 10-1 = 9 段。和「植樹問題」是同類型邏輯。'
+      }
+    ]
+  },{
+    id:5, title:'第五關：終極謎題', time:13,
+    qs:[
+      {
+        q:'你從 40 層高的梯子掉下，卻毫髮無傷，為什麼？',
+        aA:'他站在最底層', aB:'他有安全繩',
+        rA:'因為他站在梯子最底層（地面那格），「掉下來」只是落地，高度幾乎為零！',
+        rB:'安全繩！工人有安全裝備，這才是合理的工地安全解釋！',
+        reb:'Beta，這是個謎語！現實邏輯不適用。「從最底層掉下」才是驚喜答案的關鍵。',
+        cor:'alpha',
+        ex:'他站在梯子最低的一格（地面），「掉下來」不過落了幾公分！這是文字謎語的玩笑。'
+      },{
+        q:'如果你在賽跑中超越了最後一名，你現在是第幾名？',
+        aA:'倒數第二名', aB:'最後一名',
+        rA:'你超越了最後一名，你取代了他的位置，所以你現在是倒數第二名……等等，不對。如果他原本是最後一名而你超越了他，那他沒有變，你在他前面，你是倒數第二？不，這行不通——',
+        rB:'如果他是最後一名，你超過他之後，你變成了最後一名！因為他現在跑在你前面了！',
+        reb:'Beta說得對！超越最後一名意思是你從他後面跑到他前面——但最後一名後面沒人，你怎麼超越他？這說明你本來在他後面，超過之後你還是最後……等等這很燒腦。',
+        cor:'beta',
+        ex:'超越最後一名 = 你從他後面跑到前面，他現在跑在你後面。所以你現在才是最後一名！'
+      },{
+        q:'昨天的昨天的明天，是今天的什麼天？',
+        aA:'昨天', aB:'前天',
+        rA:'昨天=D-1，昨天的昨天=D-2（前天），前天的明天=D-2+1=D-1=昨天！所以答案是昨天。',
+        rB:'昨天的昨天是前天……前天的明天……感覺還是前天附近？我猜前天！',
+        reb:'Beta，讓我算給你看：D-1 → D-2 → D-2+1 = D-1，回到了昨天！腦筋急轉彎而已。',
+        cor:'alpha',
+        ex:'昨天(D-1)的昨天(D-2)的明天(D-2+1=D-1)＝昨天。繞了一圈回到昨天！'
+      }
+    ]
+  }
+];
+
+// ══════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════
+let G = {
+  name: '', lv: 0, qi: 0,
+  score: 0, lvScore: 0, lives: 3,
+  tLeft: 30, tMax: 30, tId: null,
+  canPick: false, picked: false,
+  savedScore: false
+};
+
+// ══════════════════════════════════════
+//  SCREENS
+// ══════════════════════════════════════
+function show(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+// ══════════════════════════════════════
+//  START / RESTART
+// ══════════════════════════════════════
+function startGame() {
+  G.name = document.getElementById('playerName').value.trim() || '匿名勇者';
+  G.lv = 0; G.qi = 0; G.score = 0; G.lives = 3; G.savedScore = false;
+  refreshLives();
+  loadLevel(0);
+  show('gameScreen');
+}
+
+function restartGame() { show('titleScreen'); }
+
+// ══════════════════════════════════════
+//  LEVEL / QUESTION LOAD
+// ══════════════════════════════════════
+function loadLevel(i) {
+  G.lv = i; G.qi = 0; G.lvScore = 0;
+  document.getElementById('hLv').textContent = `${i+1}/5`;
+  document.getElementById('lvBadge').textContent = LEVELS[i].title;
+  document.getElementById('hLvScore').textContent = '0';
+  loadQ();
+}
+
+function loadQ() {
+  const q = LEVELS[G.lv].qs[G.qi];
+  G.canPick = false; G.picked = false;
+
+  document.getElementById('qText').textContent = q.q;
+  renderDots();
+
+  ['ansA','rsA','rebA','ansB','rsB','rebB'].forEach(id => {
+    document.getElementById(id).textContent = '';
+  });
+
+  document.getElementById('btnA').disabled = true;
+  document.getElementById('btnB').disabled = true;
+  document.getElementById('panelA').classList.remove('speaking');
+  document.getElementById('panelB').classList.remove('speaking');
+
+  runDebate(q);
+}
+
+function renderDots() {
+  const lv = LEVELS[G.lv];
+  const el = document.getElementById('qDots');
+  el.innerHTML = lv.qs.map((_, i) =>
+    `<div class="dot ${i < G.qi ? 'done' : i === G.qi ? 'cur' : ''}"></div>`
+  ).join('');
+}
+
+// ══════════════════════════════════════
+//  DEBATE SEQUENCE
+// ══════════════════════════════════════
+async function runDebate(q) {
+  // Alpha speaks
+  setPanelSpeaking('A', true);
+  await type('ansA', `我的答案：${q.aA}`);
+  await type('rsA', q.rA, 22);
+  setPanelSpeaking('A', false);
+
+  await wait(320);
+
+  // Beta responds
+  setPanelSpeaking('B', true);
+  await type('ansB', `我的答案：${q.aB}`);
+  await type('rsB', q.rB, 22);
+  setPanelSpeaking('B', false);
+
+  await wait(320);
+
+  // Alpha rebuts (instant, shorter)
+  document.getElementById('rebA').textContent = `[反擊] ${q.reb}`;
+  setPanelSpeaking('A', true);
+  await wait(600);
+  setPanelSpeaking('A', false);
+
+  // Unlock
+  document.getElementById('btnA').disabled = false;
+  document.getElementById('btnB').disabled = false;
+  G.canPick = true;
+  startTimer();
+}
+
+function setPanelSpeaking(who, on) {
+  const panel  = document.getElementById(`panel${who}`);
+  const avatar = document.getElementById(`avatar${who}`);
+  panel.classList.toggle('speaking', on);
+  avatar.classList.toggle('talking', on);
+}
+
+async function type(id, txt, speed = 30) {
+  const el = document.getElementById(id);
+  el.classList.add('typing');
+  el.textContent = '';
+  for (let i = 0; i < txt.length; i++) {
+    el.textContent += txt[i];
+    if (i % 4 === 0) await wait(speed);
+  }
+  el.classList.remove('typing');
+}
+
+const wait = ms => new Promise(r => setTimeout(r, ms));
+
+// ══════════════════════════════════════
+//  TIMER
+// ══════════════════════════════════════
+function startTimer() {
+  stopTimer();
+  G.tMax = LEVELS[G.lv].time;
+  G.tLeft = G.tMax;
+  tick();
+  G.tId = setInterval(tick, 1000);
+}
+
+function tick() {
+  document.getElementById('hTimer').textContent = G.tLeft;
+  document.getElementById('timerFill').style.width = (G.tLeft / G.tMax * 100) + '%';
+  const el = document.getElementById('hTimer');
+  el.style.color = G.tLeft <= 5 ? '#ff4444' : G.tLeft <= 10 ? '#ffaa00' : 'var(--gold)';
+  if (G.tLeft <= 0) { stopTimer(); if (!G.picked) timeout(); return; }
+  G.tLeft--;
+}
+
+function stopTimer() {
+  clearInterval(G.tId); G.tId = null;
+}
+
+// ══════════════════════════════════════
+//  PICKING / ANSWER
+// ══════════════════════════════════════
+function pick(who) {
+  if (!G.canPick || G.picked) return;
+  G.picked = true; G.canPick = false;
+  stopTimer();
+  document.getElementById('btnA').disabled = true;
+  document.getElementById('btnB').disabled = true;
+
+  const q = LEVELS[G.lv].qs[G.qi];
+  const ok = (who === q.cor);
+  let pts = 0;
+
+  if (ok) {
+    pts = Math.floor((100 + G.tLeft * 5) * (G.lv + 1));
+    G.score += pts; G.lvScore += pts;
+    document.getElementById('hScore').textContent = G.score;
+    document.getElementById('hLvScore').textContent = G.lvScore;
+    showOverlay('ok', '✅', '答對了！', q.ex, `+${pts} 分`);
+  } else {
+    loseLife();
+    showOverlay('err', '❌', '答錯了！', q.ex, '失去一條生命');
+  }
+}
+
+function timeout() {
+  if (G.picked) return;
+  G.picked = true; G.canPick = false;
+  document.getElementById('btnA').disabled = true;
+  document.getElementById('btnB').disabled = true;
+  loseLife();
+  const q = LEVELS[G.lv].qs[G.qi];
+  showOverlay('tmo', '⏰', '時間到！', q.ex, '失去一條生命');
+}
+
+function loseLife() {
+  G.lives = Math.max(0, G.lives - 1);
+  refreshLives();
+}
+
+function refreshLives() {
+  for (let i = 1; i <= 3; i++)
+    document.getElementById(`lf${i}`).classList.toggle('lost', i > G.lives);
+}
+
+// ══════════════════════════════════════
+//  OVERLAY
+// ══════════════════════════════════════
+function showOverlay(cls, icon, title, expl, pts) {
+  const card = document.getElementById('rCard');
+  card.className = `result-card ${cls}`;
+  document.getElementById('rIcon').textContent = icon;
+  document.getElementById('rTitle').textContent = title;
+  document.getElementById('rExpl').textContent = expl;
+  document.getElementById('rPts').textContent = pts;
+  document.getElementById('overlay').classList.add('show');
+  setTimeout(() => {
+    document.getElementById('overlay').classList.remove('show');
+    after();
+  }, 2600);
+}
+
+// ══════════════════════════════════════
+//  AFTER ANSWER
+// ══════════════════════════════════════
+function after() {
+  if (G.lives <= 0) { doGameOver('生命值耗盡，闖關失敗！'); return; }
+  G.qi++;
+  if (G.qi >= LEVELS[G.lv].qs.length) { doLevelComplete(); }
+  else { loadQ(); }
+}
+
+// ══════════════════════════════════════
+//  LEVEL COMPLETE
+// ══════════════════════════════════════
+function doLevelComplete() {
+  document.getElementById('lcMsg').textContent = `完成 ${LEVELS[G.lv].title}`;
+  document.getElementById('lcScore').textContent = `本關得分：${G.lvScore}`;
+  document.getElementById('lcTotal').textContent = `累計總分：${G.score}`;
+  const btn = document.getElementById('nextBtn');
+  const last = G.lv >= LEVELS.length - 1;
+  btn.textContent = last ? '查看最終結果 🏆' : `進入第 ${G.lv + 2} 關 ▶`;
+  btn.onclick = last ? doVictory : nextLevel;
+  show('levelCompleteScreen');
+}
+
+function nextLevel() {
+  loadLevel(G.lv + 1);
+  show('gameScreen');
+}
+
+// ══════════════════════════════════════
+//  VICTORY / GAME OVER
+// ══════════════════════════════════════
+function doVictory() {
+  if (!G.savedScore) { G.savedScore = true; saveScore(); }
+  const rank = getRank();
+  document.getElementById('vcScore').textContent = `最終分數：${G.score}`;
+  document.getElementById('vcRank').textContent = rank ? `排行榜第 ${rank} 名 🎉` : '';
+  show('victoryScreen');
+}
+
+function doGameOver(reason) {
+  if (!G.savedScore) { G.savedScore = true; saveScore(); }
+  const rank = getRank();
+  document.getElementById('goReason').textContent = reason;
+  document.getElementById('goScore').textContent = `最終分數：${G.score}`;
+  document.getElementById('goRank').textContent = rank ? `進入排行榜第 ${rank} 名！` : '';
+  show('gameOverScreen');
+}
+
+// ══════════════════════════════════════
+//  LEADERBOARD
+// ══════════════════════════════════════
+const LB_KEY = 'agentBattleLB_v1';
+
+function getLB() {
+  try { return JSON.parse(localStorage.getItem(LB_KEY)) || []; }
+  catch { return []; }
+}
+
+function saveScore() {
+  const lb = getLB();
+  lb.push({ name: G.name, score: G.score, lv: G.lv + 1, date: new Date().toLocaleDateString('zh-TW') });
+  lb.sort((a, b) => b.score - a.score);
+  localStorage.setItem(LB_KEY, JSON.stringify(lb.slice(0, 10)));
+}
+
+function getRank() {
+  const lb = getLB();
+  const i = lb.findIndex(e => e.name === G.name && e.score === G.score);
+  return i >= 0 ? i + 1 : null;
+}
+
+function showLeaderboard() {
+  const lb = getLB();
+  const el = document.getElementById('lbEntries');
+  if (!lb.length) {
+    el.innerHTML = '<div class="lb-empty">尚無記錄，快來成為第一名！</div>';
+  } else {
+    const medals = ['🥇','🥈','🥉'];
+    el.innerHTML = lb.map((e, i) => {
+      const sym = medals[i] || `${i+1}`;
+      const cls = i < 3 ? `rank-${i+1}` : '';
+      const hl = (e.name === G.name && e.score === G.score) ? 'hl' : '';
+      return `
+        <div class="lb-row ${hl}">
+          <span class="lb-rank ${cls}">${sym}</span>
+          <span>${e.name}</span>
+          <span class="lb-score">${e.score.toLocaleString()}</span>
+          <span class="lb-lv">第${e.lv}關</span>
+        </div>`;
+    }).join('');
+  }
+  show('leaderboardScreen');
+}
+
+// ── Enter key on name input ──
+document.getElementById('playerName').addEventListener('keydown', e => {
+  if (e.key === 'Enter') startGame();
+});
+</script>
+</body>
+</html>
